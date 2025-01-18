@@ -283,5 +283,25 @@ plt.legend()
 plt.show()
 
 
+def apply_cost_matrix(y_true, y_pred, cost_matrix):
+
+    cm = confusion_matrix(y_true, y_pred)  # Gera a matriz de confusão
+    cost = np.sum(cm * cost_matrix)       # Calcula o custo total
+    return cost
+# Geração da matriz de custo
+cost_matrix = np.array([[0, 1],  # [Custo para FP, Custo para FN]
+                        [5, 0]]) # Maior penalidade para falsos negativos
+
+# Obter predições
+best_model = results['Decision Tree']['best_model']  # Exemplo: Escolha o modelo desejado
+y_pred = best_model.predict(X_test)  # Previsões no conjunto de teste
+
+# Aplicar a matriz de custo
+total_cost = apply_cost_matrix(y_test, y_pred, cost_matrix)
+print(f"Custo Total com a Matriz de Custo: {total_cost}")
+
+
+
+
 
 
