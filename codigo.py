@@ -99,12 +99,12 @@ def train_and_evaluate_model(model_name, model, param_grid, X_train, X_test, y_t
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Benigno', 'Maligno'], yticklabels=['Benigno', 'Maligno'])
     plt.title(f"Matriz de Confusão - {model_name}")
     plt.ylabel('Classe Real')
-    plt.xlabel('Classe Prevista')
+    plt.xlabel('Classe Predita')
     plt.show()
     
     return best_model, f1, recall, auc_roc, exec_time
 
-# Treino, Avaliação e Comparação dos Modelos
+# Treinamento, Avaliação e Comparação dos Modelos
 results = {}
 
 for model_name, model in models.items():
@@ -150,7 +150,7 @@ def plot_roc_curves(models, X_test, y_test):
     plt.figure(figsize=(10, 7))
     
     for model_name, model in models.items():
-        # Obter probabilidades preditas
+        
         if hasattr(model, "predict_proba"):
             y_proba = model.predict_proba(X_test)[:, 1]
         else:
@@ -171,6 +171,7 @@ def plot_roc_curves(models, X_test, y_test):
     plt.grid()
     plt.show()
 
+# Chamando a função
 plot_roc_curves({name: result['best_model'] for name, result in results.items()}, X_test, y_test)
 
 def plot_learning_curve(model, title, X, y):
@@ -217,7 +218,7 @@ def plot_combined_roc_curves(results, X_test, y_test):
     plt.title("Combined ROC Curves")
     plt.legend(loc="lower right")
     plt.grid()
-    plt.savefig("combined_roc_curves.png")  # Salvar como imagem
+    plt.savefig("combined_roc_curves.png")  
     plt.show()
 
 # Gerar gráfico com as 3 curvas ROC
@@ -234,15 +235,15 @@ def plot_combined_learning_curves(results, X, y):
         train_scores_mean = np.mean(train_scores, axis=1)
         test_scores_mean = np.mean(test_scores, axis=1)
         
-        plt.plot(train_sizes, test_scores_mean, 'o-', label=f"{model_name} - Validação")
-        plt.plot(train_sizes, train_scores_mean, '--', label=f"{model_name} - Treino")
+        plt.plot(train_sizes, test_scores_mean, 'o-', label=f"{model_name} - Test")
+        plt.plot(train_sizes, train_scores_mean, '--', label=f"{model_name} - Training")
     
     plt.xlabel("Training Set Size")
     plt.ylabel("Score F1")
     plt.title("Combined Learning Curves")
     plt.legend(loc="best")
     plt.grid()
-    plt.savefig("combined_learning_curves.png")  # Salvar como imagem
+    plt.savefig("combined_learning_curves.png")  
     plt.show()
 
 # Gerar gráfico com as 3 curvas de aprendizagem
@@ -292,11 +293,11 @@ def apply_cost_matrix(y_true, y_pred, cost_matrix):
     cost = np.sum(cm * cost_matrix)       # Calcula o custo total
     return cost
 # Geração da matriz de custo
-cost_matrix = np.array([[0, 1],  
-                        [5, 0]]) 
+cost_matrix = np.array([[0, 1],  # [Custo para FP, Custo para FN]
+                        [5, 0]]) # Maior penalidade para falsos negativos
 
-# Obter previsões
-best_model = results['Random_Forest']['best_model']  # Exemplo: Escolha o modelo desejado
+# Obter predições
+best_model = results['Random_Forest']['best_model']  
 y_pred = best_model.predict(X_test)  # Previsões no conjunto de teste
 
 # Aplicar a matriz de custo
@@ -330,7 +331,7 @@ random_forest = joblib.load("random_forest_model.pkl")
 
 # Dividir os dados novamente para criar um conjunto de teste diferente
 X_train_new, X_test_new, y_train_new, y_test_new = train_test_split(
-    X, y, test_size=0.3, random_state=43, stratify=y
+    X, y, test_size=0.4, random_state=43, stratify=y
 )
 
 # Avaliar Decision Tree
@@ -356,3 +357,59 @@ print(classification_report(y_test_new, y_pred_rf))
 print(f"F1-Score: {f1_score(y_test_new, y_pred_rf):.4f}")
 if hasattr(random_forest, "predict_proba"):
     print(f"AUC-ROC: {roc_auc_score(y_test_new, random_forest.predict_proba(X_test_new)[:, 1]):.4f}")
+
+
+def ablation_study(model, X, y, feature_names):
+    print("\nIniciando o Ablation Study...")
+    
+    
+    results = []
+    
+    # Testar o modelo completo (sem remoção de atributos)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    f1 = f1_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
+    results.append({"removed_features": "None", "F1-Score": f1, "AUC-ROC": auc})
+    print(f"Modelo Completo -> F1-Score: {f1:.4f}, AUC-ROC: {auc:.4f}")
+    
+    # Iterar sobre os atributos, removendo um de cada vez
+    for i, feature in enumerate(feature_names):
+        # Remover a feature atual
+        X_ablation = np.delete(X, i, axis=1)
+        
+        # Dividir os dados
+        X_train, X_test, y_train, y_test = train_test_split(X_ablation, y, test_size=0.2, random_state=42, stratify=y)
+        
+        # Treinar e avaliar o modelo
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        f1 = f1_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
+        results.append({"removed_features": feature, "F1-Score": f1, "AUC-ROC": auc})
+        print(f"Sem {feature} -> F1-Score: {f1:.4f}, AUC-ROC: {auc:.4f}")
+    
+    # Converter resultados para DataFrame
+    results_df = pd.DataFrame(results)
+    
+    
+    plt.figure(figsize=(12, 6))
+    plt.barh(results_df["removed_features"], results_df["F1-Score"], color="skyblue", label="F1-Score")
+    plt.barh(results_df["removed_features"], results_df["AUC-ROC"], color="orange", alpha=0.7, label="AUC-ROC")
+    plt.xlabel("Performance Metrics")
+    plt.ylabel("Removed Features")
+    plt.title("Ablation Study - Impact of Feature Removal")
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
+    
+    return results_df
+
+# Executar Ablation Study para o Random Forest
+random_forest_results = ablation_study(random_forest, X, y, data.feature_names)
+
+# Visualizar resultados
+print("\nResultados do Ablation Study:")
+print(random_forest_results)
