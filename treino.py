@@ -15,8 +15,12 @@ from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import learning_curve
 from sklearn.metrics import recall_score
 from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.metrics import classification_report, f1_score, roc_auc_score
 from imblearn.over_sampling import SMOTE
 import numpy as np
+import joblib
+
+
 
 
 # Carregar o dataset
@@ -35,14 +39,14 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 # Definição dos modelos
 models = {
-    'Decision Tree': DecisionTreeClassifier(),
+    'Decision_Tree': DecisionTreeClassifier(),
     'SVM': SVC(probability=True),  # SVM com probabilidade para calcular AUC-ROC
-    'Random Forest': RandomForestClassifier()
+    'Random_Forest': RandomForestClassifier()
 }
 
 # Definição dos hiperparâmetros para o Grid Search
 param_grid = {
-    'Decision Tree': {
+    'Decision_Tree': {
         'max_depth': [5, 10, 15, None],
         'min_samples_split': [2, 5, 10]
     },
@@ -50,7 +54,7 @@ param_grid = {
         'C': [0.1, 1, 10],
         'kernel': ['linear', 'rbf']
     },
-    'Random Forest': {
+    'Random_Forest': {
         'n_estimators': [50, 100, 200],
         'max_depth': [5, 10, 15, None]
     }
@@ -95,12 +99,12 @@ def train_and_evaluate_model(model_name, model, param_grid, X_train, X_test, y_t
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Benigno', 'Maligno'], yticklabels=['Benigno', 'Maligno'])
     plt.title(f"Matriz de Confusão - {model_name}")
     plt.ylabel('Classe Real')
-    plt.xlabel('Classe Predita')
+    plt.xlabel('Classe Prevista')
     plt.show()
     
     return best_model, f1, recall, auc_roc, exec_time
 
-# Treinamento, Avaliação e Comparação dos Modelos
+# Treino, Avaliação e Comparação dos Modelos
 results = {}
 
 for model_name, model in models.items():
@@ -167,7 +171,6 @@ def plot_roc_curves(models, X_test, y_test):
     plt.grid()
     plt.show()
 
-# Chamando a função
 plot_roc_curves({name: result['best_model'] for name, result in results.items()}, X_test, y_test)
 
 def plot_learning_curve(model, title, X, y):
@@ -209,9 +212,9 @@ def plot_combined_roc_curves(results, X_test, y_test):
         plt.plot(fpr, tpr, label=f"{model_name} (AUC = {roc_auc:.2f})")
     
     plt.plot([0, 1], [0, 1], 'k--', lw=2)
-    plt.xlabel("Taxa de Falsos Positivos")
-    plt.ylabel("Taxa de Verdadeiros Positivos")
-    plt.title("Curvas ROC Combinadas")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("Combined ROC Curves")
     plt.legend(loc="lower right")
     plt.grid()
     plt.savefig("combined_roc_curves.png")  # Salvar como imagem
@@ -234,9 +237,9 @@ def plot_combined_learning_curves(results, X, y):
         plt.plot(train_sizes, test_scores_mean, 'o-', label=f"{model_name} - Validação")
         plt.plot(train_sizes, train_scores_mean, '--', label=f"{model_name} - Treino")
     
-    plt.xlabel("Tamanho do Conjunto de Treino")
+    plt.xlabel("Training Set Size")
     plt.ylabel("Score F1")
-    plt.title("Curvas de Aprendizagem Combinadas")
+    plt.title("Combined Learning Curves")
     plt.legend(loc="best")
     plt.grid()
     plt.savefig("combined_learning_curves.png")  # Salvar como imagem
@@ -289,19 +292,67 @@ def apply_cost_matrix(y_true, y_pred, cost_matrix):
     cost = np.sum(cm * cost_matrix)       # Calcula o custo total
     return cost
 # Geração da matriz de custo
-cost_matrix = np.array([[0, 1],  # [Custo para FP, Custo para FN]
-                        [5, 0]]) # Maior penalidade para falsos negativos
+cost_matrix = np.array([[0, 1],  
+                        [5, 0]]) 
 
-# Obter predições
-best_model = results['Decision Tree']['best_model']  # Exemplo: Escolha o modelo desejado
+# Obter previsões
+best_model = results['Random_Forest']['best_model']  # Exemplo: Escolha o modelo desejado
 y_pred = best_model.predict(X_test)  # Previsões no conjunto de teste
 
 # Aplicar a matriz de custo
 total_cost = apply_cost_matrix(y_test, y_pred, cost_matrix)
 print(f"Custo Total com a Matriz de Custo: {total_cost}")
 
+# Treinar, avaliar e guardar os modelos
+for model_name, model in models.items():
+    best_model, f1, recall, auc_roc, exec_time = train_and_evaluate_model(
+        model_name, model, param_grid[model_name], X_train, X_test, y_train, y_test
+    )
+    results[model_name] = {
+        'best_model': best_model,
+        'f1_score': f1,
+        'recall': recall,
+        'auc_roc': auc_roc,
+        'execution_time': exec_time
+    }
+
+# Guardar os modelos treinados
+joblib.dump(results['Decision_Tree']['best_model'], "decision_tree_model.pkl")
+joblib.dump(results['SVM']['best_model'], "svm_model.pkl")
+joblib.dump(results['Random_Forest']['best_model'], "random_forest_model.pkl")
+
+print("Modelos treinados e guardados com sucesso!")
 
 
+decision_tree = joblib.load("decision_tree_model.pkl")
+svm = joblib.load("svm_model.pkl")
+random_forest = joblib.load("random_forest_model.pkl")
 
+# Dividir os dados novamente para criar um conjunto de teste diferente
+X_train_new, X_test_new, y_train_new, y_test_new = train_test_split(
+    X, y, test_size=0.3, random_state=43, stratify=y
+)
 
+# Avaliar Decision Tree
+y_pred_tree = decision_tree.predict(X_test_new)
+print("Decision Tree Performance:")
+print(classification_report(y_test_new, y_pred_tree))
+print(f"F1-Score: {f1_score(y_test_new, y_pred_tree):.4f}")
+if hasattr(decision_tree, "predict_proba"):
+    print(f"AUC-ROC: {roc_auc_score(y_test_new, decision_tree.predict_proba(X_test_new)[:, 1]):.4f}")
 
+# Avaliar SVM
+y_pred_svm = svm.predict(X_test_new)
+print("\nSVM Performance:")
+print(classification_report(y_test_new, y_pred_svm))
+print(f"F1-Score: {f1_score(y_test_new, y_pred_svm):.4f}")
+if hasattr(svm, "predict_proba"):
+    print(f"AUC-ROC: {roc_auc_score(y_test_new, svm.predict_proba(X_test_new)[:, 1]):.4f}")
+
+# Avaliar Random Forest
+y_pred_rf = random_forest.predict(X_test_new)
+print("\nRandom Forest Performance:")
+print(classification_report(y_test_new, y_pred_rf))
+print(f"F1-Score: {f1_score(y_test_new, y_pred_rf):.4f}")
+if hasattr(random_forest, "predict_proba"):
+    print(f"AUC-ROC: {roc_auc_score(y_test_new, random_forest.predict_proba(X_test_new)[:, 1]):.4f}")
