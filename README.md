@@ -1,12 +1,8 @@
-Project Overview
+# Project Overview
 The goal of this project is to train and evaluate several machine learning models to classify breast cancer as benign or malignant. Models such as Decision Trees, Support Vector Machine (SVM), and Random Forest are trained on the dataset. Evaluation is performed using various metrics, including F1-Score, Recall, AUC-ROC, and Confusion Matrices. Additionally, techniques like Grid Search for hyperparameter tuning and SMOTE for handling class imbalance are applied.
 
 # Installation
-To run this project, you'll need to install several Python libraries. You can install them using the following command:
-
-pip install -r requirements.txt
-Here's the list of libraries in the requirements.txt:
-
+To run this project, you'll need to install several Python libraries:
 pandas
 scikit-learn
 seaborn
