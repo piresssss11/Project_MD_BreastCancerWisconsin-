@@ -99,12 +99,12 @@ def train_and_evaluate_model(model_name, model, param_grid, X_train, X_test, y_t
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Benigno', 'Maligno'], yticklabels=['Benigno', 'Maligno'])
     plt.title(f"Matriz de Confusão - {model_name}")
     plt.ylabel('Classe Real')
-    plt.xlabel('Classe Predita')
+    plt.xlabel('Classe Prevista')
     plt.show()
     
     return best_model, f1, recall, auc_roc, exec_time
 
-# Treinamento, Avaliação e Comparação dos Modelos
+# Treino, Avaliação e Comparação dos Modelos
 results = {}
 
 for model_name, model in models.items():
@@ -121,6 +121,14 @@ for model_name, model in models.items():
 print("\nComparação dos Modelos:")
 for model_name, result in results.items():
     print(f"{model_name}: F1-Score = {result['f1_score']:.4f}, Recall = {result['recall']:.4f}, AUC-ROC = {result['auc_roc']:.4f}, Tempo de Execução = {result['execution_time']:.4f} segundos")
+
+# Guardar os modelos treinados
+joblib.dump(results['Decision_Tree']['best_model'], "decision_tree_model.pkl")
+joblib.dump(results['SVM']['best_model'], "svm_model.pkl")
+joblib.dump(results['Random_Forest']['best_model'], "random_forest_model.pkl")
+
+print("Modelos treinados e guardados com sucesso!")
+
 
 # Validação Cruzada com Recall
 def cross_validate_model_with_recall(model, X, y):
@@ -146,56 +154,6 @@ for model_name, result in results.items():
     print(f"{model_name}: Recall (Validação Cruzada) = {result['cross_val_recall']:.4f}")
 
 
-def plot_roc_curves(models, X_test, y_test):
-    plt.figure(figsize=(10, 7))
-    
-    for model_name, model in models.items():
-        
-        if hasattr(model, "predict_proba"):
-            y_proba = model.predict_proba(X_test)[:, 1]
-        else:
-            y_proba = model.decision_function(X_test)
-        
-        # Calcular a curva ROC
-        fpr, tpr, _ = roc_curve(y_test, y_proba)
-        roc_auc = auc(fpr, tpr)
-        
-        # Plotar a curva
-        plt.plot(fpr, tpr, label=f"{model_name} (AUC = {roc_auc:.2f})")
-    
-    plt.plot([0, 1], [0, 1], 'k--', lw=2)
-    plt.xlabel("Taxa de Falsos Positivos")
-    plt.ylabel("Taxa de Verdadeiros Positivos")
-    plt.title("Curvas ROC")
-    plt.legend(loc="lower right")
-    plt.grid()
-    plt.show()
-
-# Chamando a função
-plot_roc_curves({name: result['best_model'] for name, result in results.items()}, X_test, y_test)
-
-def plot_learning_curve(model, title, X, y):
-    train_sizes, train_scores, test_scores = learning_curve(
-        model, X, y, cv=5, scoring='f1', n_jobs=-1, train_sizes=np.linspace(0.1, 1.0, 10)
-    )
-    
-    train_scores_mean = np.mean(train_scores, axis=1)
-    test_scores_mean = np.mean(test_scores, axis=1)
-    
-    plt.figure(figsize=(10, 7))
-    plt.plot(train_sizes, train_scores_mean, 'o-', label="Pontuação de Treino", color="blue")
-    plt.plot(train_sizes, test_scores_mean, 'o-', label="Pontuação de Validação", color="orange")
-    
-    plt.title(title)
-    plt.xlabel("Tamanho do Conjunto de Treino")
-    plt.ylabel("Score F1")
-    plt.legend(loc="best")
-    plt.grid()
-    plt.show()
-
-# Gerar curvas de aprendizagem para cada modelo
-for model_name, result in results.items():
-    plot_learning_curve(result['best_model'], f"Learning Curve - {model_name}", X, y)
 
 def plot_combined_roc_curves(results, X_test, y_test):
     plt.figure(figsize=(10, 7))
@@ -235,7 +193,7 @@ def plot_combined_learning_curves(results, X, y):
         train_scores_mean = np.mean(train_scores, axis=1)
         test_scores_mean = np.mean(test_scores, axis=1)
         
-        plt.plot(train_sizes, test_scores_mean, 'o-', label=f"{model_name} - Test")
+        plt.plot(train_sizes, test_scores_mean, 'o-', label=f"{model_name} - Validation")
         plt.plot(train_sizes, train_scores_mean, '--', label=f"{model_name} - Training")
     
     plt.xlabel("Training Set Size")
@@ -249,42 +207,6 @@ def plot_combined_learning_curves(results, X, y):
 # Gerar gráfico com as 3 curvas de aprendizagem
 plot_combined_learning_curves(results, X, y)
 
-for k in range(1, len(data.feature_names) + 1):
-    X_new = SelectKBest(f_classif, k=k).fit_transform(X, y)
-    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size=0.2, random_state=42, stratify=y)
-    best_model.fit(X_train, y_train)
-    f1 = f1_score(y_test, best_model.predict(X_test))
-    print(f"Número de atributos: {k}, F1-Score: {f1:.4f}")
-
-splits = [0.1, 0.2, 0.3, 0.4]
-for split in splits:
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split, random_state=42, stratify=y)
-    best_model.fit(X_train, y_train)
-    print(f"Teste: {split}, F1-Score: {f1_score(y_test, best_model.predict(X_test)):.4f}")
-
-
-benigno_f1 = f1_score(y_test[y_test == 0], best_model.predict(X_test)[y_test == 0])
-maligno_f1 = f1_score(y_test[y_test == 1], best_model.predict(X_test)[y_test == 1])
-print(f"F1 Benigno: {benigno_f1:.4f}, F1 Maligno: {maligno_f1:.4f}")
-
-
-report = pd.DataFrame(results).T
-report.to_csv("report.csv", index=True)
-
-smote = SMOTE(random_state=42)
-X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
-
-importances = best_model.feature_importances_
-indices = np.argsort(importances)[::-1]
-plt.barh(range(len(indices)), importances[indices], align="center")
-plt.yticks(range(len(indices)), np.array(data.feature_names)[indices])
-plt.title("Importância dos Atributos")
-plt.show()
-
-for column in df.columns[:-1]:
-    sns.kdeplot(df[column], label=column)
-plt.legend()
-plt.show()
 
 
 def apply_cost_matrix(y_true, y_pred, cost_matrix):
@@ -296,33 +218,14 @@ def apply_cost_matrix(y_true, y_pred, cost_matrix):
 cost_matrix = np.array([[0, 1],  # [Custo para FP, Custo para FN]
                         [5, 0]]) # Maior penalidade para falsos negativos
 
-# Obter predições
-best_model = results['Random_Forest']['best_model']  
+
+best_model = results['Decision_Tree']['best_model']  
 y_pred = best_model.predict(X_test)  # Previsões no conjunto de teste
 
 # Aplicar a matriz de custo
 total_cost = apply_cost_matrix(y_test, y_pred, cost_matrix)
 print(f"Custo Total com a Matriz de Custo: {total_cost}")
 
-# Treinar, avaliar e guardar os modelos
-for model_name, model in models.items():
-    best_model, f1, recall, auc_roc, exec_time = train_and_evaluate_model(
-        model_name, model, param_grid[model_name], X_train, X_test, y_train, y_test
-    )
-    results[model_name] = {
-        'best_model': best_model,
-        'f1_score': f1,
-        'recall': recall,
-        'auc_roc': auc_roc,
-        'execution_time': exec_time
-    }
-
-# Guardar os modelos treinados
-joblib.dump(results['Decision_Tree']['best_model'], "decision_tree_model.pkl")
-joblib.dump(results['SVM']['best_model'], "svm_model.pkl")
-joblib.dump(results['Random_Forest']['best_model'], "random_forest_model.pkl")
-
-print("Modelos treinados e guardados com sucesso!")
 
 
 decision_tree = joblib.load("decision_tree_model.pkl")
@@ -331,7 +234,7 @@ random_forest = joblib.load("random_forest_model.pkl")
 
 # Dividir os dados novamente para criar um conjunto de teste diferente
 X_train_new, X_test_new, y_train_new, y_test_new = train_test_split(
-    X, y, test_size=0.4, random_state=43, stratify=y
+    X, y, test_size=0.3, random_state=43, stratify=y
 )
 
 # Avaliar Decision Tree
@@ -390,7 +293,7 @@ def ablation_study(model, X, y, feature_names):
         results.append({"removed_features": feature, "F1-Score": f1, "AUC-ROC": auc})
         print(f"Sem {feature} -> F1-Score: {f1:.4f}, AUC-ROC: {auc:.4f}")
     
-    # Converter resultados para DataFrame
+    
     results_df = pd.DataFrame(results)
     
     
